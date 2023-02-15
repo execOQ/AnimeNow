@@ -12,8 +12,8 @@ import Foundation
 // MARK: - ChromeCastClient
 
 public struct ChromeCastClient {
-    public let scan: (Bool) -> Void
-    public let scannedDevices: () -> AsyncStream<[Device]>
+    public let scan: @Sendable (Bool) async -> Void
+    public let scannedDevices: @Sendable () -> AsyncStream<[Device]>
 }
 
 // MARK: ChromeCastClient.Device
@@ -22,6 +22,12 @@ public extension ChromeCastClient {
     struct Device {
         let id: String
         let name: String
+    }
+
+    enum Action {
+        case deviceNowOnline(Device)
+        case deviceDidChange(Device)
+        case deviceNowOffline(Device)
     }
 }
 

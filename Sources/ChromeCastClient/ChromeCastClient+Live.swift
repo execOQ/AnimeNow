@@ -11,34 +11,51 @@ import OpenCastSwift
 
 public extension ChromeCastClient {
     static let liveValue: Self = {
-        var scanner = CastDeviceScanner()
-
-        return .init(
-            scan: { $0 ? scanner.startScanning() : scanner.stopScanning() },
-            scannedDevices: {
-                if !scanner.isScanning {
-                    scanner.startScanning()
-                }
-                return .init { continuation in
-                    continuation.yield(scanner.devices.map(\.device))
-
-                    let retval = NotificationCenter.default.addObserver(
-                        forName: CastDeviceScanner.deviceListDidChange,
-                        object: scanner,
-                        queue: nil
-                    ) { _ in
-                        continuation.yield(
-                            scanner.devices.map(\.device)
-                        )
-                    }
-
-                    continuation.onTermination = { _ in
-                        NotificationCenter.default.removeObserver(retval)
-                    }
-                }
+        .init { scan in
+            if scan {
+                await CastActor.shared.scan()
+            } else {
+                await CastActor.shared.stopScan()
             }
-        )
+        } scannedDevices: {
+            .never
+        }
     }()
+}
+
+@globalActor
+private final actor CastActor {
+    static let shared = CastActor()
+
+    private let scanner = CastDeviceScanner()
+
+    init() { }
+
+    func scan() {
+        scanner.startScanning()
+    }
+
+    func stopScan() {
+        scanner.stopScanning()
+    }
+}
+
+extension CastActor {
+    final class Delegate: NSObject, CastDeviceScannerDelegate {
+        var continuation: AsyncStream<ChromeCastClient.Action>.Continuation?
+
+        func deviceDidComeOnline(_ device: CastDevice) {
+            continuation?.yield(.deviceNowOnline(device.device))
+        }
+
+        func deviceDidChange(_ device: CastDevice) {
+            continuation?.yield(.deviceDidChange(device.device))
+        }
+
+        func deviceDidGoOffline(_ device: CastDevice) {
+            continuation?.yield(.deviceNowOffline(device.device))
+        }
+    }
 }
 
 private extension CastDevice {
@@ -49,7 +66,3 @@ private extension CastDevice {
         )
     }
 }
-
-// MARK: - Delegate
-
-private class Delegate: CastClientDelegate {}

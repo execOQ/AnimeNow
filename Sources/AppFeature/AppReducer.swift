@@ -10,6 +10,7 @@ import SwiftUI
 
 import AnimeDetailFeature
 import AnimePlayerFeature
+import ChromeCastClient
 import CollectionsFeature
 import DownloadsFeature
 import HomeFeature
@@ -142,6 +143,8 @@ public struct AppReducer: ReducerProtocol {
     var downloaderClient
     @Dependency(\.videoPlayerClient)
     var videoPlayerClient
+    @Dependency(\.chromeCastClient)
+    var chromeCastClient
 
     public var body: some ReducerProtocol<State, Action> {
         Scope(state: \.settings.userSettings, action: /Action.appDelegate) {
@@ -230,6 +233,16 @@ extension AppReducer {
                                 .init { try await apiClient.request(.consumetAPI, .listProviders(of: .ANIME)) }
                             )
                         )
+                    }
+
+                    group.addTask {
+                        let devices = chromeCastClient.scannedDevices()
+
+                        for await device in devices {
+                            device.forEach { device in
+                                print("\(device)")
+                            }
+                        }
                     }
                 }
             }

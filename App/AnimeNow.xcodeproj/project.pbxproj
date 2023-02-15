@@ -353,6 +353,7 @@
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = "Shared/anime-now-info.plist";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.video";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "${PRODUCT_NAME} uses the local network to discover Cast-enabled devices on your WiFi\nnetwork.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "";
@@ -392,6 +393,7 @@
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = "Shared/anime-now-info.plist";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.video";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "${PRODUCT_NAME} uses the local network to discover Cast-enabled devices on your WiFi\nnetwork.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "";

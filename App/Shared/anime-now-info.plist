@@ -4,6 +4,11 @@
 <dict>
 	<key>GitSha</key>
 	<string>$(COMMIT)</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_googlecast._tcp</string>
+		<string>anime-now._googlecast._tcp</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
