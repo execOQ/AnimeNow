@@ -302,9 +302,15 @@ extension AppReducer {
                 .setVideoPlayer(
                     .init(
                         player: videoPlayerClient.player(),
-                        anime: resumeWatching.anime,
-                        availableProviders: state.settings.selectableAnimeProviders,
-                        selectedEpisode: Episode.ID(resumeWatching.episode.number)
+                        anime: resumeWatching.anime.eraseAsRepresentable(),
+                        stream: .init(
+                            animeId: resumeWatching.anime.id,
+                            episodeId: resumeWatching.episode.number,
+                            availableProviders: state.settings.selectableAnimeProviders
+                        ),
+                        enableDoubleTapGesture: state.settings.userSettings.videoSettings.doubleTapToSeek,
+                        showSkipTimes: state.settings.userSettings.videoSettings.showTimeStamps,
+                        skipInterval: state.settings.userSettings.videoSettings.skipTime
                     )
                 )
             )
@@ -314,13 +320,19 @@ extension AppReducer {
                 .setVideoPlayer(
                     .init(
                         player: videoPlayerClient.player(),
-                        anime: anime,
-                        availableProviders: .init(
-                            items: state.settings.animeProviders.value ?? [],
-                            selected: streamingProvider.name
+                        anime: anime.eraseAsRepresentable(),
+                        stream: .init(
+                            animeId: anime.id,
+                            episodeId: selected,
+                            availableProviders: .init(
+                                items: state.settings.animeProviders.value ?? [],
+                                selected: streamingProvider.name
+                            ),
+                            streamingProviders: [streamingProvider]
                         ),
-                        streamingProvider: streamingProvider,
-                        selectedEpisode: selected
+                        enableDoubleTapGesture: state.settings.userSettings.videoSettings.doubleTapToSeek,
+                        showSkipTimes: state.settings.userSettings.videoSettings.showTimeStamps,
+                        skipInterval: state.settings.userSettings.videoSettings.skipTime
                     )
                 )
             )
@@ -330,24 +342,30 @@ extension AppReducer {
                 .setVideoPlayer(
                     .init(
                         player: videoPlayerClient.player(),
-                        anime: anime,
-                        availableProviders: .init(
-                            items: [.init(name: "Offline")],
-                            selected: "Offline"
+                        anime: anime.eraseAsRepresentable(),
+                        stream: .init(
+                            animeId: anime.id,
+                            episodeId: selected,
+                            availableProviders: .init(
+                                items: [.init(name: "Offline")],
+                                selected: "Offline"
+                            ),
+                            streamingProviders: [.init(
+                                name: "Offline",
+                                episodes: episodes.map { episode in
+                                    .init(
+                                        title: episode.title,
+                                        number: episode.number,
+                                        description: "",
+                                        isFiller: false,
+                                        links: episode.links
+                                    )
+                                }
+                            )]
                         ),
-                        streamingProvider: .init(
-                            name: "Offline",
-                            episodes: episodes.map { episode in
-                                .init(
-                                    title: episode.title,
-                                    number: episode.number,
-                                    description: "",
-                                    isFiller: false,
-                                    links: episode.links
-                                )
-                            }
-                        ),
-                        selectedEpisode: selected
+                        enableDoubleTapGesture: state.settings.userSettings.videoSettings.doubleTapToSeek,
+                        showSkipTimes: state.settings.userSettings.videoSettings.showTimeStamps,
+                        skipInterval: state.settings.userSettings.videoSettings.skipTime
                     )
                 )
             )
@@ -381,7 +399,8 @@ extension AppReducer {
 
         case let .animeDetail(.downloadEpisode(episodeId)):
             guard let availableProviders = state.animeDetail?.stream.availableProviders,
-                  let anime = state.animeDetail?.anime.value else {
+                  let anime = state.animeDetail?.anime.value
+            else {
                 break
             }
             return .action(
@@ -454,7 +473,7 @@ extension AppReducer {
             state.settings.animeProviders = loadable
 
             if loadable.failed {
-                Logger.log(.error, "Failed to load anime providers from Consumet.")
+                Logger.log(.error, "Failed to load anime providers.")
             }
 
         default:

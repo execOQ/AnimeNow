@@ -86,11 +86,13 @@ extension AnimePlayerView {
         let status: AnimePlayerReducer.State.Status?
         let showingPlayerControls: Bool
         let loaded: Bool
+        let skipInterval: Int
 
         init(_ state: AnimePlayerReducer.State) {
             self.status = state.status
             self.showingPlayerControls = state.showPlayerOverlay
             self.loaded = state.playerDuration != 0
+            self.skipInterval = state.skipInterval
         }
 
         var canShowSeek: Bool {
@@ -111,7 +113,7 @@ extension AnimePlayerView {
         ) { viewState in
             HStack(spacing: 24) {
                 if viewState.canShowSeek {
-                    Image(systemName: "gobackward.15")
+                    Image(systemName: "gobackward.\(viewState.skipInterval)")
                         .frame(width: 48, height: 48)
                         .foregroundColor(viewState.state.loaded ? .white : .gray)
                         .contentShape(Rectangle())
@@ -148,7 +150,7 @@ extension AnimePlayerView {
                 }
 
                 if viewState.canShowSeek {
-                    Image(systemName: "goforward.15")
+                    Image(systemName: "goforward.\(viewState.skipInterval)")
                         .frame(width: 48, height: 48)
                         .contentShape(Rectangle())
                         .foregroundColor(
@@ -360,9 +362,12 @@ struct VideoPlayerViewiOS_Previews: PreviewProvider {
                 store: .init(
                     initialState: .init(
                         player: .init(),
-                        anime: Anime.narutoShippuden,
-                        availableProviders: .init(items: []),
-                        selectedEpisode: Episode.demoEpisodes[0].id
+                        anime: Anime.narutoShippuden.eraseAsRepresentable(),
+                        stream: .init(
+                            animeId: Anime.narutoShippuden.id,
+                            episodeId: 0,
+                            availableProviders: .init(items: [])
+                        )
                     ),
                     reducer: AnimePlayerReducer()
                 )

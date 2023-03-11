@@ -427,12 +427,13 @@ struct VideoPlayerViewMacOS_Previews: PreviewProvider {
             store: .init(
                 initialState: .init(
                     player: .init(),
-                    anime: Anime.narutoShippuden,
-                    availableProviders: .init(
-                        items: []
-                    ),
-                    streamingProvider: .init(name: ""),
-                    selectedEpisode: Episode.demoEpisodes[0].id
+                    anime: Anime.narutoShippuden.eraseAsRepresentable(),
+                    stream: .init(
+                        animeId: Anime.narutoShippuden.id,
+                        episodeId: 0,
+                        availableProviders: .init(items: []),
+                        streamingProviders: []
+                    )
                 ),
                 reducer: AnimePlayerReducer()
             )

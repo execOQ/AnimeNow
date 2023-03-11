@@ -28,9 +28,9 @@ public struct SettingsGroupView<Label: View, Items: View>: View {
     }
 
     public var body: some View {
-        LazyVStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 0) {
             label()
-            LazyVStack(spacing: spacing) {
+            VStack(spacing: spacing) {
                 items()
                     .cornerRadius(cornerItems ? cornerRadius : 0)
             }

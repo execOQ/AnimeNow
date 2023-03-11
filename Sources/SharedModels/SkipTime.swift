@@ -31,6 +31,10 @@ public struct SkipTime: Hashable {
     }
 
     public func isInRange(_ progress: Double) -> Bool {
-        startTime <= progress && progress <= endTime
+        startTime <= progress && progress < endTime
+    }
+
+    public var duration: Double {
+        endTime - startTime
     }
 }

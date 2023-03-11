@@ -96,7 +96,7 @@ struct TopInsetViewModifier<OverlayContent: View>: ViewModifier {
                     }
                     .padding(.bottom, ancestorTopSafeAreaInset),
 
-                alignment: .bottom
+                alignment: .top
             )
     }
 }

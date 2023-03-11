@@ -12,37 +12,63 @@ import Foundation
 // MARK: - FileClient + DependencyKey
 
 extension FileClient: DependencyKey {
-    public static let liveValue = {
-        let mainDirectory = Self.applicationDirectory
+    private actor Manager {
+        let manager: FileManager
 
-        if !FileManager.default.fileExists(atPath: mainDirectory.path) {
-            try? FileManager.default.createDirectory(
-                at: mainDirectory,
-                withIntermediateDirectories: true
+        init() {
+            self.manager = FileManager.default
+        }
+
+        func load(_ directory: URL, _ fileName: String) throws -> Data {
+            try Data(
+                contentsOf: directory
+                    .appendingPathComponent(fileName)
+                    .appendingPathExtension("json")
             )
         }
 
+        func save(_ directory: URL, _ fileName: String, _ data: Data) throws {
+            try data.write(
+                to: directory
+                    .appendingPathComponent(fileName)
+                    .appendingPathExtension("json")
+            )
+        }
+
+        func delete(_ directory: URL, _ fileName: String) throws {
+            try FileManager.default.removeItem(
+                at: directory
+                    .appendingPathComponent(fileName)
+                    .appendingPathExtension("json")
+            )
+        }
+    }
+
+    public static let liveValue = {
+        let manager = Manager()
+
+        let mainDirectory = Self.applicationDirectory
+
+        if !FileManager.default.fileExists(atPath: mainDirectory.path) {
+            do {
+                try FileManager.default.createDirectory(
+                    at: mainDirectory,
+                    withIntermediateDirectories: true
+                )
+            } catch {
+                print("Failed to create main directory: \(error)")
+            }
+        }
+
         return Self(
-            delete: { url in
-                try FileManager.default.removeItem(
-                    at: mainDirectory
-                        .appendingPathComponent(url)
-                        .appendingPathExtension("json")
-                )
+            delete: { name in
+                try await manager.delete(mainDirectory, name)
             },
-            load: { url in
-                try Data(
-                    contentsOf: mainDirectory
-                        .appendingPathComponent(url)
-                        .appendingPathExtension("json")
-                )
+            load: { name in
+                try await manager.load(mainDirectory, name)
             },
-            save: { url, data in
-                try data.write(
-                    to: mainDirectory
-                        .appendingPathComponent(url)
-                        .appendingPathExtension("json")
-                )
+            save: { name, data in
+                try await manager.save(mainDirectory, name, data)
             }
         )
     }()

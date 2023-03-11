@@ -62,29 +62,34 @@ public struct AnimePlayerView: View {
             alignment: .center
         )
         .overlay(
-            Group {
-                if !DeviceUtil.isMac {
-                    HStack(spacing: 0) {
+            WithViewStore(store, observe: \.enableDoubleTapGesture) { viewStore in
+                Group {
+                    if !DeviceUtil.isMac, viewStore.state {
+                        HStack(spacing: 0) {
+                            Color.clear
+                                .contentShape(Rectangle())
+                                .onTapGesture(count: 2) {
+                                    viewStore.send(.backwardsTapped)
+                                }
+                            Color.clear
+                                .contentShape(Rectangle())
+                                .onTapGesture(count: 2) {
+                                    viewStore.send(.forwardsTapped)
+                                }
+                        }
+                    } else {
                         Color.clear
                             .contentShape(Rectangle())
-                            .onTapGesture(count: 2) {
-                                ViewStore(store.stateless).send(.backwardsTapped)
-                            }
-                        Color.clear
-                            .contentShape(Rectangle())
-                            .onTapGesture(count: 2) {
-                                ViewStore(store.stateless).send(.forwardsTapped)
-                            }
                     }
-                    .onTapGesture {
-                        ViewStore(store.stateless).send(.playerTapped)
-                    }
-                    .frame(
-                        maxWidth: .infinity,
-                        maxHeight: .infinity,
-                        alignment: .center
-                    )
                 }
+                .onTapGesture {
+                    ViewStore(store.stateless).send(.playerTapped)
+                }
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity,
+                    alignment: .center
+                )
             }
         )
         .overlay(errorOverlay)
@@ -214,12 +219,15 @@ extension AnimePlayerView {
 
 extension AnimePlayerView {
     struct SkipActionViewState: Equatable {
-        let canShowButton: Bool
-        let action: AnimePlayerReducer.State.ActionType?
+        let actions: [AnimePlayerReducer.State.ActionType]
+        let canShowActions: Bool
+        var visible: Bool {
+            canShowActions && !actions.isEmpty
+        }
 
         init(_ state: AnimePlayerReducer.State) {
-            self.action = state.skipAction
-            self.canShowButton = state.selectedSidebar == nil && action != nil && state.playerDuration > 0.0
+            self.actions = state.skipActions
+            self.canShowActions = state.selectedSidebar == nil && state.playerDuration > .zero
         }
     }
 
@@ -229,75 +237,27 @@ extension AnimePlayerView {
             store,
             observe: SkipActionViewState.init
         ) { viewState in
-            Group {
-                if viewState.state.canShowButton {
-                    switch viewState.state.action {
-                    case let .some(.skipRecap(to: end)),
-                         let .some(.skipOpening(to: end)),
-                         let .some(.skipEnding(to: end)):
-
-                        actionButtonBase(
-                            "forward.fill",
-                            viewState.state.action?.title ?? "",
-                            .white,
-                            .init(white: 0.25)
-                        ) {
-                            viewState.send(.seeking(to: end))
+            ZStack {
+                if viewState.visible {
+                    HStack {
+                        Spacer()
+                        ForEach(viewState.actions, id: \.self) { action in
+                            SkipActionButton(action: action) { send in
+                                viewState.send(send)
+                            }
                         }
-
-                    case let .some(.nextEpisode(id)):
-                        actionButtonBase(
-                            "play.fill",
-                            viewState.state.action?.title ?? "",
-                            .black,
-                            .white
-                        ) {
-                            viewState.send(.stream(.selectEpisode(id)))
-                        }
-
-                    case .none:
-                        EmptyView()
                     }
+                    .frame(maxWidth: .infinity)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+                    .dismissable(.easeInOut(duration: 0.2))
                 }
             }
-            .frame(
-                maxWidth: .infinity,
-                alignment: .trailing
-            )
-            .transition(.move(edge: .trailing).combined(with: .opacity))
             .animation(
-                .easeInOut(duration: 0.5),
-                value: viewState.canShowButton
+                .easeInOut(duration: 0.25),
+                value: viewState.state
             )
         }
         .padding(.vertical, 4)
-    }
-
-    @ViewBuilder
-    private func actionButtonBase(
-        _ image: String,
-        _ title: String,
-        _ textColor: Color,
-        _ background: Color,
-        _ action: (() -> Void)? = nil
-    ) -> some View {
-        Button {
-            action?()
-        } label: {
-            HStack {
-                Image(systemName: image)
-                Text(title)
-            }
-            .font(.system(size: 13).weight(.heavy))
-            .foregroundColor(textColor)
-            .padding(12)
-            .background(background)
-            .cornerRadius(12)
-            .clipShape(Capsule())
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .shadow(color: Color.gray.opacity(0.25), radius: 6)
     }
 }
 
@@ -750,6 +710,49 @@ extension AnimePlayerView {
     }
 }
 
+// MARK: - SkipActionButton
+
+struct SkipActionButton: View {
+    let action: AnimePlayerReducer.State.ActionType
+    let callback: (AnimePlayerReducer.Action) -> Void
+
+    var body: some View {
+        Button {
+            callback(action.action)
+        } label: {
+            HStack {
+                Image(systemName: action.image)
+                Text(action.title)
+            }
+            .font(.system(size: 13).weight(.heavy))
+            .foregroundColor(action.textColor)
+            .padding(12)
+            .background(action.background.opacity(0.8))
+            .cornerRadius(6)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .shadow(color: Color.gray.opacity(0.25), radius: 6)
+        .transition(.move(edge: .trailing).combined(with: .opacity))
+    }
+}
+
+extension AnimePlayerReducer.State.ActionType {
+    var textColor: Color {
+        if case .nextEpisode = self {
+            return .black
+        }
+        return .white
+    }
+
+    var background: Color {
+        if case .nextEpisode = self {
+            return .white
+        }
+        return .init(white: 0.25)
+    }
+}
+
 // MARK: - VideoPlayerView_Previews
 
 struct VideoPlayerView_Previews: PreviewProvider {
@@ -758,13 +761,16 @@ struct VideoPlayerView_Previews: PreviewProvider {
             store: .init(
                 initialState: .init(
                     player: .init(),
-                    anime: Anime.narutoShippuden,
-                    availableProviders: .init(items: []),
-                    streamingProvider: .init(
-                        name: "Offline",
-                        episodes: Episode.demoEpisodes
-                    ),
-                    selectedEpisode: Episode.demoEpisodes[0].id
+                    anime: Anime.narutoShippuden.eraseAsRepresentable(),
+                    stream: .init(
+                        animeId: Anime.narutoShippuden.id,
+                        episodeId: Episode.demoEpisodes[0].id,
+                        availableProviders: .init(items: []),
+                        streamingProviders: [.init(
+                            name: "Offline",
+                            episodes: Episode.demoEpisodes
+                        )]
+                    )
                 ),
                 reducer: AnimePlayerReducer()
             )

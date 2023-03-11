@@ -29,39 +29,47 @@ public struct SettingsReducer: ReducerProtocol {
     public struct State: Equatable {
         // MARK: Anime Providers
 
-        public var animeProviders = Loadable<[ProviderInfo]>.idle
+        public var animeProviders: Loadable<[ProviderInfo]>
 
         // MARK: Discord Properties
 
-        public var supportsDiscord = false
-        public var discordStatus = DiscordClient.Status.offline
+        public var supportsDiscord: Bool
+        public var discordStatus: DiscordClient.Status
 
-        public var buildVersion = "Unknown"
+        public var buildVersion: String
 
         // MARK: Storage Settings
 
-        public var imageCacheUsage = 0
-        public var imageCacheCapacity = 0
+        public var imageCacheUsage: Int
+        public var imageCacheCapacity: Int
 
         // MARK: Account Services
 
-        var anilistUser = AuthState<AniListClient.User>.unauthenticated
-        var myanimelistUser = AuthState<MyAnimeListClient.User>.unauthenticated
-        var kitsuUser = AuthState<KitsuClient.User>.unauthenticated
+        var anilistUser: AuthState<AniListClient.User>
+        var myanimelistUser: AuthState<MyAnimeListClient.User>
+        var kitsuUser: AuthState<KitsuClient.User>
 
         // MARK: User Settings
 
-        @BindableState
-        public var userSettings = UserSettings()
+        @BindingState
+        public var userSettings: UserSettings
+
+        #if os(iOS)
+        var logoutAlert: ConfirmationDialogState<LogoutAction>?
+        #else
+        var logoutAlert: AlertState<LogoutAction>?
+        #endif
 
         public init(
-            animeProviders: Loadable<[ProviderInfo]> = Loadable<[ProviderInfo]>.idle,
+            animeProviders: Loadable<[ProviderInfo]> = .idle,
             supportsDiscord: Bool = false,
             discordStatus: DiscordClient.Status = DiscordClient.Status.offline,
             buildVersion: String = "Unknown",
-            imageCacheUsage: Int = 0, imageCacheCapacity: Int = 0,
-            anilistUser: AuthState<AniListClient.User> = .unauthenticated,
-            myanimelistUser: AuthState<MyAnimeListClient.User> = .unauthenticated,
+            imageCacheUsage: Int = 0,
+            imageCacheCapacity: Int = 0,
+            anilistUser: AuthState<AniListClient.User> = AuthState<AniListClient.User>.unauthenticated,
+            myanimelistUser: AuthState<MyAnimeListClient.User> = AuthState<MyAnimeListClient.User>.unauthenticated,
+            kitsuUser: AuthState<KitsuClient.User> = AuthState<KitsuClient.User>.unauthenticated,
             userSettings: UserSettings = UserSettings()
         ) {
             self.animeProviders = animeProviders
@@ -81,7 +89,6 @@ public struct SettingsReducer: ReducerProtocol {
         case refetchImageCache
         case resetImageCache
         case anilistLogin
-        case anilistLogout
         case anilist(AuthState<AniListClient.User>)
         case myanimelistLogin
         case myanimelistLogout
@@ -148,7 +155,7 @@ extension SettingsReducer.State {
                     )
                 },
                 login: .anilistLogin,
-                logout: .anilistLogout,
+                logout: .logoutAlert(.mal),
                 palette: [
                     .init(red: 0.40392156, green: 0.423529411764706, blue: 0.454901960784314),
                     .init(red: 0.01, green: 0.56, blue: 0.83),
@@ -413,3 +420,16 @@ public extension SettingsReducer.State {
         }
     }
 }
+
+#if os(iOS)
+extension AlertState {
+    var confirmationState: ConfirmationDialogState<Action> {
+        .init(
+            title: title,
+            titleVisibility: .automatic,
+            message: message,
+            buttons: buttons
+        )
+    }
+}
+#endif

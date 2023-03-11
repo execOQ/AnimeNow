@@ -38,7 +38,7 @@ public extension VideoPlayerClient {
                     }
                 }
             },
-            execute: { action in Task.detached { wrapper.handle(action) } },
+            execute: { action in wrapper.handle(action) },
             player: { wrapper.player }
         )
     }()
