@@ -131,172 +131,125 @@ public extension KitsuModels {
         }
     }
 
-//    struct GlobalTrendingQuery: KitsuQuery {
-//        let globalTrending: GraphQL.NodeList<Anime, PageInfo>
-//
-//        enum Argument: GraphQLArgument {
-//            case mediaType(MediaType)
-//            case first(Int)
-//
-//
-//            var description: String {
-//                switch self {
-//                case .mediaType:
-//                    return "mediaType"
-//                case .first:
-//                    return "first"
-//                }
-//            }
-//
-//            func getValue() -> ArgumentValueRepresentable {
-//                switch self {
-//                case .mediaType(let mediaType):
-//                    return mediaType
-//                case .first(let int):
-//                    return int
-//                }
-//            }
-//        }
-//
-//        struct ArgumentOptions {
-//            var first: Int = 7
-//        }
-//
-//        static func createQuery(
-//            _ arguments: ArgumentOptions
-//        ) -> Weave {
-//            Weave(.query) {
-//                Object(GlobalTrending.self) {
-//                    Anime.createQueryObject(GraphQL.NodeList<Anime, PageInfo>.CodingKeys.nodes)
-//                    PageInfo.createQueryObject(GraphQL.NodeList<Anime, PageInfo>.CodingKeys.pageInfo)
-//                }
-//                .argument(Argument.mediaType(.ANIME))
-//                .argument(Argument.first(arguments.first))
-//            }
-//        }
-//    }
-//
-//    struct SearchAnimeByTitle: GraphQLQuery {
-//        let searchAnimeByTitle: GraphQL.NodeList<Anime, PageInfo>
-//
-//        enum Argument: GraphQLArgument {
-//            case title(String)
-//            case first(Int)
-//
-//            var description: String {
-//                switch self {
-//                case .title:
-//                    return "title"
-//                case .first:
-//                    return "first"
-//                }
-//            }
-//
-//            func getValue() -> ArgumentValueRepresentable {
-//                switch self {
-//                case .title(let title):
-//                    return title
-//                case .first(let first):
-//                    return first
-//                }
-//            }
-//        }
-//
-//        struct ArgumentOptions {
-//            let title: String
-//            var first: Int = 10
-//        }
-//
-//        static func createQuery(
-//            _ arguments: ArgumentOptions
-//        ) -> Weave {
-//            Weave(.query) {
-//                Object(SearchAnimeByTitle.self) {
-//                    Anime.createQueryObject(GraphQL.NodeList<Anime, PageInfo>.CodingKeys.nodes)
-//                    PageInfo.createQueryObject(GraphQL.NodeList<Anime, PageInfo>.CodingKeys.pageInfo)
-//                }
-//                .argument(Argument.title(arguments.title))
-//                .argument(Argument.first(arguments.first))
-//            }
-//        }
-//    }
-//
-//    struct AnimeByStatus: GraphQLQuery {
-//        let animeByStatus: GraphQL.NodeList<Anime, PageInfo>
-//
-//        struct ArgumentOptions {
-//            let first: Int
-//            let status: Anime.Status
-//        }
-//
-//        enum Argument: GraphQLArgument {
-//            case first(Int)
-//            case status(Anime.Status)
-//
-//            func getValue() -> ArgumentValueRepresentable {
-//                switch self {
-//                case .first(let int):
-//                    return int
-//                case .status(let status):
-//                    return status
-//                }
-//            }
-//
-//            var description: String {
-//                switch self {
-//                case .first:
-//                    return "first"
-//                case .status:
-//                    return "status"
-//                }
-//            }
-//        }
-//
-//        static func createQuery(_ arguments: ArgumentOptions) -> Weave {
-//            Weave(.query) {
-//                Object(Self.self) {
-//                    Anime.createQueryObject(GraphQL.NodeList<Anime, PageInfo>.CodingKeys.nodes)
-//                    PageInfo.createQueryObject(GraphQL.NodeList<Anime, PageInfo>.CodingKeys.pageInfo)
-//                }
-//                .argument(Argument.first(arguments.first))
-//                .argument(Argument.status(arguments.status))
-//            }
-//        }
-//    }
-//
-//    struct FindAnimeById: GraphQLQuery {
-//        let findAnimeById: Anime
-//
-//        struct ArgumentOptions {
-//            let id: String
-//            var episodesOnly = false
-//        }
-//
-//        enum Argument: GraphQLArgument {
-//            case id(String)
-//
-//            func getValue() -> ArgumentValueRepresentable {
-//                switch self {
-//                case .id(let str):
-//                    return str
-//                }
-//            }
-//
-//            var description: String {
-//                switch self {
-//                case .id:
-//                    return "id"
-//                }
-//            }
-//        }
-//
-//        static func createQuery(_ arguments: ArgumentOptions) -> Weave {
-//            Weave(.query) {
-//                Anime.createQueryObject(CodingKeys.findAnimeById)
-//                    .argument(Argument.id(arguments.id))
-//            }
-//        }
-//    }
+    struct LibraryEntryUpdateProgressByMediaMutation: KitsuQuery {
+        public typealias Response = GraphQL.Response<Self>
+
+        public struct QueryOptions: ArgumentValueRepresentable {
+            let mediaId: String
+            let mediaType: KitsuModels.MediaType
+            let progress: Int
+
+            public var argumentValue: String {
+                "{ mediaId: \(mediaId), mediaType: \(mediaType.rawValue), progress: \(progress) }"
+            }
+
+            public init(
+                mediaId: String,
+                mediaType: KitsuModels.MediaType = .ANIME,
+                progress: Int
+            ) {
+                self.mediaId = mediaId
+                self.mediaType = mediaType
+                self.progress = progress
+            }
+        }
+
+        let libraryEntry: EmptyResponse
+
+        public static func createQuery(_ options: QueryOptions) -> Weave {
+            Weave(.mutation) {
+                Object(name: "libraryEntry") {
+                    Object(name: "updateProgressByMedia") {
+                        Object("libraryEntry") {
+                            Field("id")
+                        }
+                    }
+                    .argument(key: "input", value: options)
+                }
+            }
+        }
+    }
+
+    struct LibraryEntryUpdateStatusByMediaMutation: KitsuQuery {
+        public typealias Response = GraphQL.Response<Self>
+
+        public struct QueryOptions: ArgumentValueRepresentable {
+            let mediaId: String
+            let mediaType: KitsuModels.MediaType
+            let status: KitsuModels.LibraryEntry.Status
+
+            public var argumentValue: String {
+                "{ mediaId: \(mediaId), mediaType: \(mediaType.rawValue), status: \(status.rawValue) }"
+            }
+
+            public init(
+                mediaId: String,
+                mediaType: KitsuModels.MediaType = .ANIME,
+                status: KitsuModels.LibraryEntry.Status
+            ) {
+                self.mediaId = mediaId
+                self.mediaType = mediaType
+                self.status = status
+            }
+        }
+
+        let libraryEntry: EmptyResponse
+
+        public static func createQuery(_ options: QueryOptions) -> Weave {
+            Weave(.mutation) {
+                Object(name: "libraryEntry") {
+                    Object(name: "updateStatusByMedia") {
+                        Object("libraryEntry") {
+                            Field("id")
+                        }
+                    }
+                    .argument(key: "input", value: options)
+                }
+            }
+        }
+    }
+
+    struct LibraryEntryCreateMutation: KitsuQuery {
+        public typealias Response = GraphQL.Response<Self>
+
+        public struct QueryOptions: ArgumentValueRepresentable {
+            let mediaId: String
+            let mediaType: KitsuModels.MediaType
+            let status: KitsuModels.LibraryEntry.Status
+            let progress: Int
+
+            public var argumentValue: String {
+                "{ mediaId: \(mediaId), mediaType: \(mediaType.rawValue), status: \(status.rawValue) progress: \(progress) }"
+            }
+
+            public init(
+                mediaId: String,
+                mediaType: KitsuModels.MediaType = .ANIME,
+                status: KitsuModels.LibraryEntry.Status = .CURRENT,
+                progress: Int = 0
+            ) {
+                self.mediaId = mediaId
+                self.mediaType = mediaType
+                self.progress = progress
+                self.status = status
+            }
+        }
+
+        let libraryEntry: EmptyResponse
+
+        public static func createQuery(_ options: QueryOptions) -> Weave {
+            Weave(.mutation) {
+                Object(name: "libraryEntry") {
+                    Object(name: "create") {
+                        Object(name: "libraryEntry") {
+                            Field("id")
+                        }
+                    }
+                    .argument(key: "input", value: options)
+                }
+            }
+        }
+    }
 }
 
 public extension KitsuModels {
@@ -464,18 +417,6 @@ public extension KitsuModels {
                         Field(CodingKeys.units)
                     }
                 }
-            }
-        }
-    }
-
-    struct CategoryConnection: Decodable, Equatable {
-        let nodes: [Category]
-
-        static func createQueryObject(
-            _ name: CodingKey
-        ) -> Object {
-            Object(name: name) {
-                Category.createQueryObject(CodingKeys.nodes)
             }
         }
     }
@@ -702,8 +643,6 @@ public extension KitsuModels {
 
         let id: String
         let slug: String
-        let description: Localization
-        let categories: CategoryConnection
         let posterImage: Image?
         let bannerImage: Image?
         let titles: Titles
@@ -711,15 +650,12 @@ public extension KitsuModels {
         let averageRatingRank: Int?
         let status: Status
         let userCountRank: Int?
-        let productions: MediaProductionConnection
         let ageRating: AgeRating?
         let startDate: String?
-        let mappings: MappingConnection
 
         // Anime Only
 
         let season: ReleaseSeason?
-        let youtubeTrailerVideoId: String?
         let totalLength: Int?
         let subtype: Subtype?
 
@@ -730,9 +666,6 @@ public extension KitsuModels {
             Object(name: name) {
                 Field(CodingKeys.id)
                 Field(CodingKeys.slug)
-                Field(CodingKeys.description)
-                CategoryConnection.createQueryObject(CodingKeys.categories)
-                    .slice(amount: 3)
                 Image.createQueryObject(CodingKeys.posterImage)
                 Image.createQueryObject(CodingKeys.bannerImage)
                 Titles.createQueryObject(CodingKeys.titles)
@@ -740,15 +673,11 @@ public extension KitsuModels {
                 Field(CodingKeys.averageRatingRank)
                 Field(CodingKeys.status)
                 Field(CodingKeys.userCountRank)
-                MediaProductionConnection.createQueryObject(CodingKeys.productions)
                 Field(CodingKeys.ageRating)
                 Field(CodingKeys.startDate)
 
-                MappingConnection.createQueryObject(CodingKeys.mappings)
-
                 InlineFragment("Anime") {
                     Field(CodingKeys.season)
-                    Field(CodingKeys.youtubeTrailerVideoId)
                     Field(CodingKeys.totalLength)
                     Field(CodingKeys.subtype)
                 }
@@ -851,10 +780,10 @@ public extension KitsuModels {
             malId: nil,
             title: anime.titles.translated ?? anime.titles.romanized ?? anime.titles.canonical ?? anime.titles
                 .original ?? "Untitled",
-            description: anime.description.en ?? "Anime description is not available.",
+            description: "Anime description is not available.",
             posterImage: .init(posterImageSizes),
             coverImage: .init(coverImageSizes),
-            categories: anime.categories.nodes.compactMap(\.title.en),
+            categories: [],
             status: .init(rawValue: anime.status.rawValue.lowercased()) ?? .upcoming,
             format: anime.subtype == .MOVIE ? .movie : .tv,
             releaseYear: Int(dateFormatter.date(from: anime.startDate ?? "")?.getYear() ?? ""),

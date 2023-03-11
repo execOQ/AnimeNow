@@ -270,6 +270,70 @@ public extension AniListModels {
             }
         }
     }
+
+    struct MediaListQuery: AniListQuery {
+        public typealias Response = GraphQL.Response<Self>
+
+        public let MediaList: MediaList
+
+        public struct QueryOptions {
+            let userId: Int
+            let mediaId: Int
+
+            public init(
+                userId: Int,
+                mediaId: Int
+            ) {
+                self.userId = userId
+                self.mediaId = mediaId
+            }
+        }
+
+        public static func createQuery(_ options: QueryOptions) -> Weave {
+            Weave(.query) {
+                AniListModels.MediaList.createQueryObject(CodingKeys.MediaList)
+                    .argument(key: "userId", value: options.userId)
+                    .argument(key: "mediaId", value: options.mediaId)
+                    .caseStyle(.pascalCase)
+            }
+        }
+    }
+
+    struct SaveMediaListEntryMutation: AniListQuery {
+        public typealias Response = GraphQL.Response<Self>
+
+        public let SaveMediaListEntry: MediaList
+
+        public struct QueryOptions {
+            let id: Int?
+            let mediaId: Int
+            let status: MediaList.Status?
+            let progress: Int?
+
+            public init(
+                id: Int? = nil,
+                mediaId: Int,
+                status: MediaList.Status? = nil,
+                progress: Int? = nil
+            ) {
+                self.id = id
+                self.mediaId = mediaId
+                self.progress = progress
+                self.status = status
+            }
+        }
+
+        public static func createQuery(_ options: QueryOptions) -> Weave {
+            Weave(.mutation) {
+                AniListModels.MediaList.createQueryObject(CodingKeys.SaveMediaListEntry)
+                    .argument(key: "id", value: options.id)
+                    .argument(key: "mediaId", value: options.mediaId)
+                    .argument(key: "progress", value: options.progress)
+                    .argument(key: "status", value: options.status)
+                    .caseStyle(.pascalCase)
+            }
+        }
+    }
 }
 
 // MARK: - GraphQL Models
@@ -469,19 +533,19 @@ public extension AniListModels {
 
         public static var pageResponseName: String { "media" }
 
-        let id: Int
-        let idMal: Int?
-        let title: Title
-        let type: MediaType
-        let format: Format
-        let status: Status
-        let description: String?
-        let seasonYear: Int?
-        let coverImage: MediaCoverImage
-        let bannerImage: String?
-        let startDate: FuzzyDate
-        let averageScore: Int?
-        let genres: [String]
+        public let id: Int
+        public let idMal: Int?
+        public let title: Title
+        public let type: MediaType
+        public let format: Format
+        public let status: Status
+        public let description: String?
+        public let seasonYear: Int?
+        public let coverImage: MediaCoverImage
+        public let bannerImage: String?
+        public let startDate: FuzzyDate
+        public let averageScore: Int?
+        public let genres: [String]
 
         public enum Filter: DefaultArguments {
             case id(Int)
@@ -628,10 +692,10 @@ public extension AniListModels {
         }
 
         public struct Title: GraphQLQueryObject, Equatable {
-            let romaji: String?
-            let english: String?
-            let native: String?
-            let userPreferred: String?
+            public let romaji: String?
+            public let english: String?
+            public let native: String?
+            public let userPreferred: String?
 
             public static func createQueryObject(
                 _ name: String,

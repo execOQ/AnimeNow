@@ -116,12 +116,12 @@ extension CollectionsView {
             Text("Sign in to \(name) to view your collections!")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .authenticating:
-            Text("Authenticating to \(name)...")
+            Text("Loading collections from \(name)...")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         case let .authenticated(value):
             collectionSection(value)
         case .failed:
-            Text("Failed to authenticate to \(name).")
+            Text("Failed to load collections from \(name).")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }

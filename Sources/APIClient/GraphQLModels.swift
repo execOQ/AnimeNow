@@ -107,8 +107,16 @@ enum WeavableBuilder {
         GroupWeave(items: components)
     }
 
-    static func buildEither(_ component: ObjectWeavable) -> ObjectWeavable {
+    static func buildEither(first component: ObjectWeavable) -> ObjectWeavable {
         component
+    }
+
+    static func buildEither(second component: ObjectWeavable) -> ObjectWeavable {
+        component
+    }
+
+    static func buildArray(_ components: [ObjectWeavable]) -> ObjectWeavable {
+        GroupWeave(items: components)
     }
 
     static func buildOptional(_ component: ObjectWeavable?) -> ObjectWeavable {

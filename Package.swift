@@ -237,6 +237,7 @@ let package = Package(
             name: "APIClient",
             dependencies: [
                 "AuthenticationClient",
+                "Build",
                 "Logger",
                 "SharedModels",
                 "Utilities",

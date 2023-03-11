@@ -48,6 +48,12 @@ public struct SettingsView: View {
         .onAppear {
             viewStore.send(.onAppear)
         }
+        .confirmationDialog(
+            store.scope(state: \.logoutAlert) { child in
+                SettingsReducer.Action.logoutAlertAction(child)
+            },
+            dismiss: .cancel
+        )
         #else
         TabView {
             ScrollView {
@@ -119,6 +125,12 @@ public struct SettingsView: View {
         .onAppear {
             viewStore.send(.onAppear)
         }
+        .alert(
+            store.scope(state: \.logoutAlert) { child in
+                SettingsReducer.Action.logoutAlertAction(child)
+            },
+            dismiss: .cancel
+        )
         #endif
     }
 }
@@ -230,7 +242,12 @@ extension SettingsView {
 extension SettingsView {
     @ViewBuilder
     var tracking: some View {
-        SettingsGroupView(title: "Tracking") {}
+        SettingsGroupView(title: "Tracking") {
+            SettingsRowView(
+                name: "Auto Track Episodes",
+                active: viewStore.binding(\.$userSettings.trackingSettings.autoTrackEpisodes)
+            )
+        }
     }
 }
 
@@ -289,6 +306,19 @@ extension SettingsView {
                                 .foregroundColor(.init(white: 1.0))
 
                                 Spacer()
+
+                                if let accountURL = user.pageURL {
+                                    Button {
+                                        openURL(accountURL)
+                                    } label: {
+                                        Image(systemName: "square.and.arrow.up")
+                                            .font(.system(size: 13, weight: .semibold))
+                                            .frame(width: 24, height: 24)
+                                            .foregroundColor(.white)
+                                            .contentShape(Rectangle())
+                                    }
+                                    .buttonStyle(.plain)
+                                }
                             }
                             .padding(.horizontal)
                             .frame(height: 96)
@@ -357,10 +387,10 @@ extension SettingsView {
             SettingsGroupView(title: "Discord") {
                 SettingsRowView(
                     name: "Enable",
-                    active: viewStore.binding(\.$userSettings.discordEnabled)
+                    active: viewStore.binding(\.$userSettings.discordSettings.discordEnabled)
                 )
 
-                if viewStore.userSettings.discordEnabled {
+                if viewStore.userSettings.discordSettings.discordEnabled {
                     SettingsRowView(
                         name: "Status",
                         text: viewStore.discordStatus.rawValue

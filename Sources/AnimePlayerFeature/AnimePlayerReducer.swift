@@ -77,10 +77,6 @@ public struct AnimePlayerReducer: ReducerProtocol {
         public var selectedSidebar: Sidebar?
         public var showPlayerOverlay = true
 
-        // Internal
-
-        var hasInitialized = false
-
         // Shared Player Properties
 
         public var playerProgress: Double = 0.0
@@ -98,6 +94,11 @@ public struct AnimePlayerReducer: ReducerProtocol {
         public var enableDoubleTapGesture = true
         public var showSkipTimes = true
         public var skipInterval = 15
+        public var autoTrackEpisodes = true
+
+        // Internal
+
+        var hasInitialized = false
 
         public init(
             player: AVPlayer,
@@ -114,8 +115,10 @@ public struct AnimePlayerReducer: ReducerProtocol {
             playerPiPStatus: VideoPlayer.PIPStatus = VideoPlayer.PIPStatus.restoreUI,
             playerPiPActive: Bool = false,
             playerGravity: AVLayerVideoGravity = VideoPlayer.Gravity.resizeAspect,
-            enableDoubleTapGesture: Bool = true, showSkipTimes: Bool = true,
-            skipInterval: Int = 15
+            enableDoubleTapGesture: Bool = true,
+            showSkipTimes: Bool = true,
+            skipInterval: Int = 15,
+            autoTrackEpisodes: Bool = true
         ) {
             self.player = player
             self.anime = anime
@@ -134,6 +137,7 @@ public struct AnimePlayerReducer: ReducerProtocol {
             self.enableDoubleTapGesture = enableDoubleTapGesture
             self.showSkipTimes = showSkipTimes
             self.skipInterval = skipInterval
+            self.autoTrackEpisodes = autoTrackEpisodes
         }
     }
 
@@ -206,6 +210,8 @@ public struct AnimePlayerReducer: ReducerProtocol {
     var animeClient
     @Dependency(\.databaseClient)
     var databaseClient
+    @Dependency(\.trackingListClient)
+    var trackingListClient
     @Dependency(\.videoPlayerClient)
     var videoPlayerClient
     @Dependency(\.userDefaultsClient)
@@ -899,10 +905,13 @@ extension AnimePlayerReducer {
     }
 
     private func saveEpisodeState(state: State, episodeId: Episode.ID? = nil) -> EffectTask<Action> {
+        struct SyncCancellationId: Hashable {}
+
         let episodeId = episodeId ?? state.stream.selectedEpisode
         guard let episode = state.stream.streamingProvider?.episodes[id: episodeId],
               state.playerDuration > 0,
-              var animeStore = state.animeStore.value else {
+              var animeStore = state.animeStore.value
+        else {
             return .none
         }
 
@@ -913,8 +922,21 @@ extension AnimePlayerReducer {
             progress: progress
         )
 
-        return .run { [animeStore, episodeId] _ in
-            try await databaseClient.insert(animeStore)
-        }
+        let autoTrack = state.autoTrackEpisodes
+
+        return .merge(
+            .run { [animeStore] _ in
+                try await databaseClient.insert(animeStore)
+            },
+            .run { [animeStore, episodeId] _ in
+                if autoTrack,
+                   let episode = animeStore.episodes.first(where: { $0.number == episodeId }),
+                   episode.almostFinished {
+                    try await withTaskCancellation(id: SyncCancellationId.self, cancelInFlight: true) {
+                        try await trackingListClient.sync(animeStore.id, episodeId)
+                    }
+                }
+            }
+        )
     }
 }

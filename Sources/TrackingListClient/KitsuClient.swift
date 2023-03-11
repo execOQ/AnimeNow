@@ -15,7 +15,8 @@ import Utilities
 
 // MARK: - KitsuClient
 
-public struct KitsuClient {
+public struct KitsuClient: TrackableList {
+    public var name: String { "Kitsu" }
     public let initialize: @Sendable () async throws -> Void
     public let logIn: @Sendable () async throws -> User
     public let logOut: @Sendable ()
@@ -26,6 +27,7 @@ public struct KitsuClient {
     public let user: @Sendable ()
         async -> User?
     public let userCollections: @Sendable () async throws -> Collections
+    public let sync: @Sendable (String, Int?) async throws -> Void
 }
 
 public extension KitsuClient {
@@ -50,10 +52,11 @@ extension KitsuClient.AccessToken {
 // MARK: - KitsuClient + DependencyKey
 
 extension KitsuClient: DependencyKey {
-    private actor Session {
-        nonisolated let accessToken = LockIsolated<AccessToken?>(nil)
-        nonisolated let user = LockIsolated<User?>(nil)
-        var userCollections: Collections?
+    private final actor Session: @unchecked
+    Sendable {
+        let accessToken = AsyncLock<AccessToken?>(nil)
+        let user = AsyncLock<User?>(nil)
+        let userCollections = AsyncLock<Collections?>(nil)
 
         private static let accessTokenFile = "kitsu-access-token"
 
@@ -68,8 +71,8 @@ extension KitsuClient: DependencyKey {
 
         func initialize() async throws {
             let accessToken = try await fileClient.load(AccessToken.self, from: Self.accessTokenFile)
-            self.accessToken.setValue(accessToken)
-            _ = try await refreshUser()
+            await self.accessToken.setValue(accessToken)
+            _ = try await getUser(refresh: true)
         }
 
         func logIn() async throws -> User {
@@ -83,7 +86,7 @@ extension KitsuClient: DependencyKey {
                 description: "Log in with your Kitsu credentials!"
             ) { [unowned self] userInfo in
                 guard let password = userInfo.password
-                    .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
+                    .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowedRFC3986) else {
                     throw KitsuLogInError.malformedPassword
                 }
                 return try await apiClient.request(
@@ -97,32 +100,42 @@ extension KitsuClient: DependencyKey {
             }
 
             try await updateAccessToken(token)
-            return try await refreshUser()
+            return try await getUser(refresh: true)
         }
 
         func logOut() async {
-            user.setValue(nil)
-            userCollections = nil
+            await user.setValue(nil)
+            await userCollections.setValue(nil)
             try? await updateAccessToken(nil)
         }
 
-        func refreshUser() async throws -> User {
-            try await tokenRequired { [unowned self] token in
-                let user = try await apiClient.request(
-                    .kitsu(
-                        .graphql(KitsuModels.CurrentAccountQuery.self, .init(), token.access_token)
-                    )
-                )
-                .data
-                .currentAccount
-                .profile
-                self.user.setValue(user)
-                return user
+        func getUser(refresh: Bool = false) async throws -> User {
+            try await user.withValue { user in
+                if !refresh, let user {
+                    return user
+                } else {
+                    let newUser = try await tokenRequired { token in
+                        try await apiClient.request(
+                            .kitsu(
+                                .graphql(
+                                    KitsuModels.CurrentAccountQuery.self,
+                                    .init(),
+                                    token.access_token
+                                )
+                            )
+                        )
+                        .data
+                        .currentAccount
+                        .profile
+                    }
+                    user = newUser
+                    return newUser
+                }
             }
         }
 
         func userCollections(refresh: Bool = false) async throws -> Collections {
-            if !refresh, let userCollections {
+            if !refresh, let userCollections = await userCollections.value {
                 return userCollections
             } else {
                 let library = try await tokenRequired { [unowned self] token in
@@ -147,16 +160,75 @@ extension KitsuClient: DependencyKey {
                 .profile
                 .library
 
+                await userCollections.setValue(library)
+
                 guard let library else {
                     throw URLError(.resourceUnavailable)
                 }
-                userCollections = library
                 return library
             }
         }
 
-        private func tokenRequired<O>(_ operation: @escaping (AccessToken) async throws -> O) async throws -> O {
-            guard let token = accessToken.value else {
+        func sync(_ animeId: String, _ progress: Int?) async throws {
+            try await tokenRequired { [unowned self] token in
+                if let progress {
+                    let inLibrary = try? await apiClient.request(
+                        .kitsu(
+                            .graphql(
+                                KitsuModels.LibraryEntryUpdateProgressByMediaMutation.self,
+                                .init(
+                                    mediaId: animeId,
+                                    mediaType: .ANIME,
+                                    progress: progress
+                                ),
+                                token.access_token
+                            )
+                        )
+                    )
+
+                    if inLibrary == nil {
+                        try await apiClient.request(
+                            .kitsu(
+                                .graphql(
+                                    KitsuModels.LibraryEntryCreateMutation.self,
+                                    .init(mediaId: animeId, progress: progress),
+                                    token.access_token
+                                )
+                            )
+                        )
+                    }
+                } else {
+                    let inLibrary = try? await apiClient.request(
+                        .kitsu(
+                            .graphql(
+                                KitsuModels.LibraryEntryUpdateStatusByMediaMutation.self,
+                                .init(
+                                    mediaId: animeId,
+                                    mediaType: .ANIME,
+                                    status: .CURRENT
+                                ),
+                                token.access_token
+                            )
+                        )
+                    )
+
+                    if inLibrary == nil {
+                        try await apiClient.request(
+                            .kitsu(
+                                .graphql(
+                                    KitsuModels.LibraryEntryCreateMutation.self,
+                                    .init(mediaId: animeId),
+                                    token.access_token
+                                )
+                            )
+                        )
+                    }
+                }
+            }
+        }
+
+        private func tokenRequired<O>(_ operation: (AccessToken) async throws -> O) async throws -> O {
+            guard let token = await accessToken.value else {
                 throw URLError(.userAuthenticationRequired)
             }
 
@@ -177,7 +249,7 @@ extension KitsuClient: DependencyKey {
             } else {
                 try await fileClient.delete(Self.accessTokenFile)
             }
-            self.accessToken.setValue(accessToken)
+            await self.accessToken.setValue(accessToken)
         }
     }
 
@@ -188,10 +260,19 @@ extension KitsuClient: DependencyKey {
             initialize: { try await session.initialize() },
             logIn: { try await session.logIn() },
             logOut: { await session.logOut() },
-            loggedIn: { session.accessToken.value != nil },
-            refreshUser: { try await session.refreshUser() },
-            user: { session.user.value },
-            userCollections: { try await session.userCollections() }
+            loggedIn: { await session.accessToken.value != nil },
+            refreshUser: { try await session.getUser(refresh: true) },
+            user: { await session.user.value },
+            userCollections: { try await session.userCollections() },
+            sync: { try await session.sync($0, $1) }
         )
     }()
+}
+
+private extension CharacterSet {
+    static var urlQueryAllowedRFC3986: CharacterSet {
+        var alphanums = alphanumerics
+        alphanums.insert(charactersIn: "-._~")
+        return alphanums
+    }
 }

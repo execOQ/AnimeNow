@@ -109,6 +109,42 @@ public extension MalEndpoint {
             ]
         )
     }
+
+    struct ListItemUpdate {
+        let mediaId: Int
+        let status: MalModels.Status?
+        let numWatchedEpisodes: Int?
+
+        public init(
+            mediaId: Int,
+            status: MalModels.Status? = nil,
+            numWatchedEpisodes: Int? = nil
+        ) {
+            self.mediaId = mediaId
+            self.status = status
+            self.numWatchedEpisodes = numWatchedEpisodes
+        }
+    }
+
+    static func updateListItem(accessToken: String, _ item: ListItemUpdate) -> MalEndpoint<EmptyResponse> {
+        let body = [
+            "status": item.status?.rawValue,
+            "num_watched_episodes": item.numWatchedEpisodes?.description
+        ]
+        .compactMapValues { $0 }
+        .map { "\($0.key)=\($0.value)" }
+        .joined(separator: "&")
+        .data(using: .utf8) ?? .init()
+
+        return .init(
+            path: ["anime", "\(item.mediaId)", "my_list_status"],
+            method: .put(body),
+            headers: [
+                "Authorization": "Bearer \(accessToken)",
+                "Content-Type": "application/x-www-form-urlencoded"
+            ]
+        )
+    }
 }
 
 public extension Request {
@@ -211,15 +247,13 @@ public extension MalModels {
         public let list_status: ListStatus
 
         public struct ListStatus: Decodable, Equatable, FieldsParameters {
-            public let status: Status
+            public let status: Status?
             public let score: Int
             public let num_episodes_watched: Int
             public let is_rewatching: Bool
-            public let start_date: Date?
-            public let finish_date: Date?
-            public let priority: Int?
+//            public let start_date: String?
+//            public let finish_date: String?
             public let num_times_rewatched: Int?
-            public let rewatch_value: Int?
             public let tags: [String]?
             public let comments: String?
             public let updated_at: String?
@@ -230,11 +264,9 @@ public extension MalModels {
                     CodingKeys.score,
                     CodingKeys.num_episodes_watched,
                     CodingKeys.is_rewatching,
-                    CodingKeys.start_date,
-                    CodingKeys.finish_date,
-                    CodingKeys.priority,
+//                    CodingKeys.start_date,
+//                    CodingKeys.finish_date,
                     CodingKeys.num_times_rewatched,
-                    CodingKeys.rewatch_value,
                     CodingKeys.tags,
                     CodingKeys.comments,
                     CodingKeys.updated_at

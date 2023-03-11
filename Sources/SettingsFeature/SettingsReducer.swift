@@ -80,6 +80,7 @@ public struct SettingsReducer: ReducerProtocol {
             self.imageCacheCapacity = imageCacheCapacity
             self.anilistUser = anilistUser
             self.myanimelistUser = myanimelistUser
+            self.kitsuUser = kitsuUser
             self.userSettings = userSettings
         }
     }
@@ -91,13 +92,33 @@ public struct SettingsReducer: ReducerProtocol {
         case anilistLogin
         case anilist(AuthState<AniListClient.User>)
         case myanimelistLogin
-        case myanimelistLogout
         case myanimelist(AuthState<MyAnimeListClient.User>)
         case kitsuLogin
-        case kitsuLogout
         case kitsu(AuthState<KitsuClient.User>)
+        case logoutAlert(LogoutAction)
+        case logoutAlertAction(LogoutAction)
         case discordStatus(DiscordClient.Status)
         case binding(BindingAction<State>)
+    }
+
+    public enum LogoutAction: CustomStringConvertible, Equatable {
+        case anilist
+        case kitsu
+        case mal
+        case cancel
+
+        public var description: String {
+            switch self {
+            case .anilist:
+                return "AniList"
+            case .kitsu:
+                return "Kitsu"
+            case .mal:
+                return "MyAnimeList"
+            case .cancel:
+                return ""
+            }
+        }
     }
 
     @Dependency(\.anilistClient)
@@ -151,7 +172,8 @@ extension SettingsReducer.State {
                         name: user.name,
                         profileImage: (user.avatar?.large ?? user.avatar?.large).flatMap { .init(string: $0) },
                         bannerImage: user.bannerImage.flatMap { .init(string: $0) },
-                        episodesWatched: user.statistics?.anime.episodesWatched ?? 0
+                        episodesWatched: user.statistics?.anime.episodesWatched ?? 0,
+                        pageURL: .init(string: "https://anilist.co/user/\(user.name)")
                     )
                 },
                 login: .anilistLogin,
@@ -173,11 +195,12 @@ extension SettingsReducer.State {
                         profileImage: userInfo.picture
                             .flatMap { .init(string: $0) },
                         bannerImage: nil,
-                        episodesWatched: userInfo.anime_statistics?.num_episodes ?? 0
+                        episodesWatched: userInfo.anime_statistics?.num_episodes ?? 0,
+                        pageURL: .init(string: "https://myanimelist.net/profile/\(userInfo.name)")
                     )
                 },
                 login: .myanimelistLogin,
-                logout: .myanimelistLogout,
+                logout: .logoutAlert(.mal),
                 palette: [
                     .init(red: 0.18, green: 0.32, blue: 0.64),
                     .init(red: 0.27, green: 0.27, blue: 0.27),
@@ -194,11 +217,12 @@ extension SettingsReducer.State {
                         name: user.name,
                         profileImage: user.avatarImage?.original.url,
                         bannerImage: user.bannerImage?.original.url,
-                        episodesWatched: nil
+                        episodesWatched: nil,
+                        pageURL: .init(string: "https://kitsu.io/users/\(user.id)")
                     )
                 },
                 login: .kitsuLogin,
-                logout: .kitsuLogout,
+                logout: .logoutAlert(.kitsu),
                 palette: [
                     .init(red: 0.19, green: 0.15, blue: 0.19),
                     .init(red: 0.55, green: 0.23, blue: 0.20),
@@ -242,70 +266,72 @@ extension SettingsReducer {
             return setupCache(&state)
 
         case .anilistLogin:
-            state.anilistUser = .authenticating
-            return .run { send in
-                do {
-                    let user = try await anilistClient.logIn()
-                    await send(.anilist(.authenticated(user)))
-                } catch {
-                    Logger.log(.debug, "Failed to log in with AniList: \(error)")
-                    await send(.anilistLogout)
-                }
-            }
-
-        case .anilistLogout:
-            state.anilistUser = .unauthenticated
-            return .run {
-                await anilistClient.logOut()
-            }
+            return login(
+                &state,
+                anilistClient,
+                \.anilistUser,
+                /Action.anilist
+            )
 
         case let .anilist(auth):
             state.anilistUser = auth
 
         case .myanimelistLogin:
-            state.myanimelistUser = .authenticating
-            return .run { send in
-                do {
-                    let user = try await myanimelistClient.logIn()
-                    await send(.myanimelist(.authenticated(user)))
-                } catch {
-                    Logger.log(.debug, "Failed to log in with MyAnimeList: \(error)")
-                    await send(.myanimelistLogout)
-                }
-            }
-
-        case .myanimelistLogout:
-            state.myanimelistUser = .unauthenticated
-            return .run {
-                await myanimelistClient.logOut()
-            }
+            return login(
+                &state,
+                myanimelistClient,
+                \.myanimelistUser,
+                /Action.myanimelist
+            )
 
         case let .myanimelist(auth):
             state.myanimelistUser = auth
 
         case .kitsuLogin:
-            state.kitsuUser = .authenticating
-            return .run { send in
-                do {
-                    let user = try await kitsuClient.logIn()
-                    await send(.kitsu(.authenticated(user)))
-                } catch {
-                    Logger.log(.debug, "Failed to log in with Kitsu: \(error)")
-                    await send(.kitsuLogout)
-                }
+            return login(
+                &state,
+                kitsuClient,
+                \.kitsuUser,
+                /Action.kitsu
+            )
+
+        case let .kitsu(auth):
+            state.kitsuUser = auth
+
+        case let .logoutAlert(action):
+            state.logoutAlert = AlertState(
+                title: .init("Confirm Logout"),
+                message: .init("Are you sure you want to log out of \(action.description)?"),
+                primaryButton: .destructive(.init("Log out"), action: .send(action)),
+                secondaryButton: .cancel(.init("Cancel"))
+            )
+            #if os(iOS)
+            .confirmationState
+            #endif
+
+        case .logoutAlertAction(.anilist):
+            state.anilistUser = .unauthenticated
+            return .run {
+                await anilistClient.logOut()
             }
 
-        case .kitsuLogout:
+        case .logoutAlertAction(.mal):
+            state.myanimelistUser = .unauthenticated
+            return .run {
+                await myanimelistClient.logOut()
+            }
+
+        case .logoutAlertAction(.kitsu):
             state.kitsuUser = .unauthenticated
             return .run {
                 await kitsuClient.logOut()
             }
 
-        case let .kitsu(auth):
-            state.kitsuUser = auth
+        case .logoutAlertAction(.cancel):
+            state.logoutAlert = nil
 
-        case .binding(\.$userSettings.discordEnabled):
-            let enabled = state.userSettings.discordEnabled
+        case .binding(\.$userSettings.discordSettings.discordEnabled):
+            let enabled = state.userSettings.discordSettings.discordEnabled
 
             return .run { _ in
                 try await discordClient.setActive(enabled)
@@ -342,46 +368,60 @@ extension SettingsReducer {
     }
 
     private func setupTrackers(_: inout State) -> EffectTask<Action> {
-        .run { send in
-            await withThrowingTaskGroup(of: Void.self) { group in
-                group.addTask {
-                    if await anilistClient.loggedIn() {
-                        await send(.anilist(.authenticating))
-                        if let user = await anilistClient.user() {
-                            await send(.anilist(.authenticated(user)))
-                        } else {
-                            await send(.anilist(.init { try await anilistClient.refreshUser() }))
-                        }
-                    } else {
-                        await send(.anilist(.unauthenticated))
+        struct SetupTrackersCancellable: Hashable {}
+        return .run { send in
+            await withTaskCancellation(
+                id: SetupTrackersCancellable.self,
+                cancelInFlight: true
+            ) {
+                await withThrowingTaskGroup(of: Void.self) { group in
+                    group.addTask {
+                        try await fetchUser(send, anilistClient, /Action.anilist)
                     }
-                }
 
-                group.addTask {
-                    if await myanimelistClient.loggedIn() {
-                        await send(.myanimelist(.authenticating))
-                        if let user = await myanimelistClient.user() {
-                            await send(.myanimelist(.authenticated(user)))
-                        } else {
-                            await send(.myanimelist(.init { try await myanimelistClient.refreshUser() }))
-                        }
-                    } else {
-                        await send(.myanimelist(.unauthenticated))
+                    group.addTask {
+                        try await fetchUser(send, myanimelistClient, /Action.myanimelist)
                     }
-                }
 
-                group.addTask {
-                    if await kitsuClient.loggedIn() {
-                        await send(.kitsu(.authenticating))
-                        if let user = await kitsuClient.user() {
-                            await send(.kitsu(.authenticated(user)))
-                        } else {
-                            await send(.kitsu(.init { try await kitsuClient.refreshUser() }))
-                        }
-                    } else {
-                        await send(.kitsu(.unauthenticated))
+                    group.addTask {
+                        try await fetchUser(send, kitsuClient, /Action.kitsu)
                     }
                 }
+            }
+        }
+    }
+
+    private func fetchUser<T: TrackableList>(
+        _ send: EffectTask<Action>.Send,
+        _ client: T,
+        _ casePath: CasePath<Action, AuthState<T.User>>
+    ) async throws {
+        if await client.loggedIn() {
+            await send(casePath.embed(.authenticating))
+            if let user = await client.user() {
+                await send(casePath.embed(.authenticated(user)))
+            } else {
+                await send(casePath.embed(.init { try await client.refreshUser() }))
+            }
+        } else {
+            await send(casePath.embed(.unauthenticated))
+        }
+    }
+
+    private func login<T: TrackableList>(
+        _ state: inout State,
+        _ client: T,
+        _ keyPath: WritableKeyPath<State, AuthState<T.User>>,
+        _ casePath: CasePath<Action, AuthState<T.User>>
+    ) -> EffectTask<Action> {
+        state[keyPath: keyPath] = .authenticating
+        return .run { send in
+            do {
+                let user = try await client.logIn()
+                await send(casePath.embed(.authenticated(user)))
+            } catch {
+                Logger.log(.debug, "Failed to log in with \(client.name): \(error)")
+                await send(casePath.embed(.unauthenticated))
             }
         }
     }
@@ -417,6 +457,7 @@ public extension SettingsReducer.State {
             let profileImage: URL?
             let bannerImage: URL?
             let episodesWatched: Int?
+            let pageURL: URL?
         }
     }
 }

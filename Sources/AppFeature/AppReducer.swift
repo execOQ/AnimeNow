@@ -146,6 +146,8 @@ public struct AppReducer: ReducerProtocol {
     var kitsuClient
     @Dependency(\.myanimelistClient)
     var myanimelistClient
+    @Dependency(\.trackingListClient)
+    var trackingListClient
     @Dependency(\.videoPlayerClient)
     var videoPlayerClient
 
@@ -198,7 +200,7 @@ public extension AppReducer.State {
 }
 
 extension AppReducer {
-    // swiftlint:disable cyclomatic_complexity
+    // swiftlint:disable cyclomatic_complexity function_body_length
     func core(state: inout State, action: Action) -> EffectTask<Action> {
         switch action {
         case .appDelegate(.appDidEnterBackground):
@@ -255,6 +257,15 @@ extension AppReducer {
         case let .setVideoPlayer(item):
             state.videoPlayer = item
 
+        case .videoPlayer(.onAppear):
+            if state.settings.userSettings.trackingSettings.autoTrackEpisodes,
+               let id = state.videoPlayer?.anime.id,
+               let episodeProgress = state.videoPlayer?.stream.selectedEpisode {
+                return .run {
+                    try await trackingListClient.sync(id, max(episodeProgress - 1, 0))
+                }
+            }
+
         case let .setAnimeDetail(animeMaybe):
             if let anime = animeMaybe, state.animeDetail == nil {
                 // Allow only replacing anime detail one at a time
@@ -310,7 +321,8 @@ extension AppReducer {
                         ),
                         enableDoubleTapGesture: state.settings.userSettings.videoSettings.doubleTapToSeek,
                         showSkipTimes: state.settings.userSettings.videoSettings.showTimeStamps,
-                        skipInterval: state.settings.userSettings.videoSettings.skipTime
+                        skipInterval: state.settings.userSettings.videoSettings.skipTime,
+                        autoTrackEpisodes: state.settings.userSettings.trackingSettings.autoTrackEpisodes
                     )
                 )
             )
@@ -332,7 +344,8 @@ extension AppReducer {
                         ),
                         enableDoubleTapGesture: state.settings.userSettings.videoSettings.doubleTapToSeek,
                         showSkipTimes: state.settings.userSettings.videoSettings.showTimeStamps,
-                        skipInterval: state.settings.userSettings.videoSettings.skipTime
+                        skipInterval: state.settings.userSettings.videoSettings.skipTime,
+                        autoTrackEpisodes: state.settings.userSettings.trackingSettings.autoTrackEpisodes
                     )
                 )
             )
@@ -365,7 +378,8 @@ extension AppReducer {
                         ),
                         enableDoubleTapGesture: state.settings.userSettings.videoSettings.doubleTapToSeek,
                         showSkipTimes: state.settings.userSettings.videoSettings.showTimeStamps,
-                        skipInterval: state.settings.userSettings.videoSettings.skipTime
+                        skipInterval: state.settings.userSettings.videoSettings.skipTime,
+                        autoTrackEpisodes: state.settings.userSettings.trackingSettings.autoTrackEpisodes
                     )
                 )
             )

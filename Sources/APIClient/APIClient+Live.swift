@@ -6,13 +6,14 @@
 //
 //
 
+import Build
 import ComposableArchitecture
 import Foundation
 import Logger
 
 // MARK: - APIClientLive
 
-public class APIClientLive: APIClient {
+public final class APIClientLive: APIClient {
     public func request<O>(_ request: Request<O>) async throws -> O where O: Decodable {
         do {
             var urlRequest = try request.makeRequest()
@@ -39,7 +40,7 @@ extension Request: CustomStringConvertible {
             path: \(path),
             query: \(query ?? []),
             method: \(method),
-            headers: \(headers?.mapValues { $0.description.localizedCaseInsensitiveContains("Bearer") ? "**********" : $0 } ?? [:])
+            headers: \(headers?.mapValues { $0.description.localizedCaseInsensitiveContains("Bearer") ? "***" : $0 } ?? [:])
         )
         """
     }
@@ -61,6 +62,8 @@ extension Request: CustomStringConvertible {
 
         if case let .post(data) = method {
             urlRequest.httpBody = data
+        } else if case let .put(data) = method {
+            urlRequest.httpBody = data
         }
 
         headers?.forEach { key, value in
@@ -72,11 +75,13 @@ extension Request: CustomStringConvertible {
 
 private extension URLRequest {
     mutating func setHeaders() {
+        @Dependency(\.build)
+        var build
         let info = Bundle.main.infoDictionary
         let executable = info?[kCFBundleNameKey as String] ?? "Anime Now!"
         let bundle = info?[kCFBundleIdentifierKey as String] ?? "Unknown"
-        let appVersion = info?["CFBundleShortVersionString"] ?? "Unknown"
-        let appCommit = info?["GitSha"] ?? "Unknown"
+        let appVersion = build.version()
+        let appCommit = build.gitSha()
         let osVersion = {
             let version = ProcessInfo.processInfo.operatingSystemVersion
             return "\(version.majorVersion).\(version.minorVersion).\(version.patchVersion)"

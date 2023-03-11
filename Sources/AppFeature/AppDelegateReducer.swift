@@ -82,7 +82,7 @@ extension AppDelegateReducer {
         case let .userSettingsLoaded(result):
             state = result.value ?? state
             return .run { [state] _ in
-                try await discordClient.setActive(state.discordEnabled)
+                try await discordClient.setActive(state.discordSettings.discordEnabled)
             }
 
         default:

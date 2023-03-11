@@ -69,6 +69,7 @@ public struct Request<O: Decodable> {
     enum Method: CustomStringConvertible {
         case get
         case post(Data)
+        case put(Data)
 
         var stringValue: String {
             switch self {
@@ -76,6 +77,8 @@ public struct Request<O: Decodable> {
                 return "GET"
             case .post:
                 return "POST"
+            case .put:
+                return "PUT"
             }
         }
 
@@ -85,6 +88,8 @@ public struct Request<O: Decodable> {
                 return "GET"
             case let .post(data):
                 return "POST: \(String(data: data, encoding: .utf8) ?? "Unknown")"
+            case let .put(data):
+                return "PUT: \(String(data: data, encoding: .utf8) ?? "Unknown")"
             }
         }
     }

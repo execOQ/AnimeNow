@@ -14,7 +14,7 @@ import Utilities
 // MARK: - TrackingListClient
 
 public struct TrackingListClient {
-    let sync: () async throws -> Void
+    public let sync: (Int, Int?) async throws -> Void
 }
 
 // MARK: DependencyKey
